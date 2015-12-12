@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font: 10px sans-serif;
+  shape-rendering: crispEdges;
+}
+
+.day {
+  fill: #fff;
+  stroke: #ccc;
+}
+
+.month {
+  fill: none;
+  stroke: #000;
+  stroke-width: 2px;
+}
+
+.q0-11{fill:rgb(165,0,38)}
+.q1-11{fill:rgb(215,48,39)}
+.q2-11{fill:rgb(244,109,67)}
+.q3-11{fill:rgb(253,174,97)}
+.q4-11{fill:rgb(254,224,139)}
+.q5-11{fill:rgb(255,255,191)}
+.q6-11{fill:rgb(217,239,139)}
+.q7-11{fill:rgb(166,217,106)}
+.q8-11{fill:rgb(102,189,99)}
+.q9-11{fill:rgb(26,152,80)}
+.q10-11{fill:rgb(0,104,55)}
+
+</style>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+<h2>Running Distance Calander</h2>
+    <p>  </p>
+    <div class="guide_cont"></div>
+    <div class="map"></div>
+<script>
+
+var width = 960,
+    height = 136,
+    cellSize = 17; // cell size
+
+var percent = d3.format(".1%"),
+    format = d3.time.format("%Y-%m-%d");
+
+var color = d3.scale.quantize()
+    .domain([-.05, .05])
+    .range(d3.range(11).map(function(d) { return "q" + d + "-11"; }));
+
+var guide = d3.select(".guide_cont").append("svg").attr("width", 900).attr("height",75);
+var guide_squares = {};
+var labels= {};
+for(var i = 0; i < 11; i++){
+    guide_squares[i] = guide.append("rect").attr("x", 10+i*50).attr("y", 10).attr("width", 17).attr("height", 17)
+        .attr("class", function(d) { return "q"+i+"-11"; });
+    labels[i] = guide.append("text").attr("x", 15+i*50).attr("y", 50).attr("text-anchor", "middle")  
+        .style("font-size", "16px");
+}
+labels[0].text(">26")
+/*labels[1]
+labels[2]
+labels[3]
+labels[4]*/
+labels[5].text("~8")
+/*labels[6]
+labels[7]
+labels[8]
+labels[9]*/
+labels[10].text("<2.5")
+    
+// build calander
+var svg = d3.select(".map").selectAll("svg")
+    .data(d3.range(2015, 2016))
+  .enter().append("svg")
+    .attr("width", width)
+    .attr("height", height)
+    .attr("class", "RdYlGn")
+  .append("g")
+    .attr("transform", "translate(" + ((width - cellSize * 53) / 2) + "," + (height - cellSize * 7 - 1) + ")");
+
+svg.append("text")
+    .attr("transform", "translate(-6," + cellSize * 3.5 + ")rotate(-90)")
+    .style("text-anchor", "middle")
+    .text(function(d) { return d; });
+
+var rect = svg.selectAll(".day")
+    .data(function(d) { return d3.time.days(new Date(d, 0, 1), new Date(d + 1, 0, 1)); })
+  .enter().append("rect")
+    .attr("class", "day")
+    //.attr("class", )
+    .attr("width", cellSize)
+    .attr("height", cellSize)
+    .attr("x", function(d) { return d3.time.weekOfYear(d) * cellSize; })
+    .attr("y", function(d) { return d.getDay() * cellSize; })
+    .datum(format);
+
+rect.append("title")
+    .text(function(d) { return d; });
+
+svg.selectAll(".month")
+    .data(function(d) { return d3.time.months(new Date(d, 0, 1), new Date(d + 1, 0, 1)); })
+  .enter().append("path")
+    .attr("class", "month")
+    .attr("d", monthPath);
+
+function monthPath(t0) {
+  var t1 = new Date(t0.getFullYear(), t0.getMonth() + 1, 0),
+      d0 = t0.getDay(), w0 = d3.time.weekOfYear(t0),
+      d1 = t1.getDay(), w1 = d3.time.weekOfYear(t1);
+  return "M" + (w0 + 1) * cellSize + "," + d0 * cellSize
+      + "H" + w0 * cellSize + "V" + 7 * cellSize
+      + "H" + w1 * cellSize + "V" + (d1 + 1) * cellSize
+      + "H" + (w1 + 1) * cellSize + "V" + 0
+      + "H" + (w0 + 1) * cellSize + "Z";
+}
+
+var months = {
+    'Jan' : '01',
+    'Feb' : '02',
+    'Mar' : '03',
+    'Apr' : '04',
+    'May' : '05',
+    'Jun' : '06',
+    'Jul' : '07',
+    'Aug' : '08',
+    'Sep' : '09',
+    'Oct' : '10',
+    'Nov' : '11',
+    'Dev' : '12'
+}
+
+d3.csv("./data/master.csv", function(error, csv){
+    /*
+    var count = 0;
+    csv.forEach(function(d){
+        console.log((count++) + "::" + d.Distance);
+    });
+    */
+    if (error) throw error;
+
+    //%Y-%m-%d"
+    var data = d3.nest()
+        .key(function(d) { 
+            var datetok = (d.Start).replace(/,/g, '').split(" ");
+            //console.log( datetok[4]+"-"+months[datetok[2]]+"-"+datetok[3] );
+            //var tempDate = new Date(datetok[3],months[datetok[1]],datetok[2],0,0,0,0);
+            var day;
+            if(datetok[2].length != 2){
+                day = "0"+datetok[2]
+            }
+            else
+                day = datetok[2];
+            return (datetok[3]+"-"+months[datetok[1]]+"-"+day); })
+        .rollup(function(d) { return (d[0].Distance); })
+        .map(csv);
+
+    rect.filter(function(d) { return d in data; })
+            .attr("class", function(d) { 
+        
+                // control block for finding color to use
+                var rawdat = (data[d]/26.2).toFixed(2);
+                if( rawdat >= 1 ){
+                    return "day q0-11"; 
+                }
+                else if( rawdat >= .8 ){
+                    return "day q1-11"; 
+                }
+                else if( rawdat >= .6 ){
+                    return "day q2-11"; 
+                }
+                else if( rawdat >= .5 ){
+                    return "day q3-11"; 
+                }
+                else if( rawdat >= .4 ){
+                    return "day q4-11"; 
+                }
+                else if( rawdat >= .30 ){
+                    return "day q5-11"; 
+                }
+                else if( rawdat >= .28 ){
+                    return "day q6-11"; 
+                }
+                else if( rawdat >= .22 ){
+                    return "day q7-11"; 
+                }
+                else if( rawdat >= .1 ){
+                    return "day q8-11"; 
+                }
+                else if( rawdat >= .08 ){
+                    return "day q9-11"; 
+                }
+                else{
+                    return "day q10-11"; 
+                }
+        
+                //return "day " + "q2-11"; 
+            })
+        .select("title")
+            .text(function(d) { return d + ": " + percent(data[d]); });
+    
+});
+    
+d3.select(self.frameElement).style("height", "2910px");
+
+/*
+    .RdYlGn .q0-11{fill:rgb(165,0,38)}
+.RdYlGn .q1-11{fill:rgb(215,48,39)}
+.RdYlGn .q2-11{fill:rgb(244,109,67)}
+.RdYlGn .q3-11{fill:rgb(253,174,97)}
+.RdYlGn .q4-11{fill:rgb(254,224,139)}
+.RdYlGn .q5-11{fill:rgb(255,255,191)}
+.RdYlGn .q6-11{fill:rgb(217,239,139)}
+.RdYlGn .q7-11{fill:rgb(166,217,106)}
+.RdYlGn .q8-11{fill:rgb(102,189,99)}
+.RdYlGn .q9-11{fill:rgb(26,152,80)}
+.RdYlGn .q10-11{fill:rgb(0,104,55)}
+    
+  */  
+    
+    
+    
+</script>
+    
+</body>
